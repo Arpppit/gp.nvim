@@ -81,14 +81,6 @@ M.setup = function(opts)
 	M.config.image = nil
 	opts.image = nil
 
-	local whisper_opts = opts.whisper or {}
-	whisper_opts.style_popup_border = opts.style_popup_border or M.config.style_popup_border
-	whisper_opts.curl_params = curl_params
-	whisper_opts.cmd_prefix = cmd_prefix
-	M.whisper.setup(whisper_opts)
-	M.config.whisper = nil
-	opts.whisper = nil
-
 	-- merge nested tables
 	local mergeTables = { "hooks", "agents" }
 	for _, tbl in ipairs(mergeTables) do
@@ -320,7 +312,7 @@ M.prepare_commands = function()
 		-- uppercase first letter
 		local command = name:gsub("^%l", string.upper)
 
-		local cmd = function(params, whisper)
+		local cmd = function(params)
 			local agent = M.get_command_agent()
 			-- popup is like ephemeral one off chat
 			if target == M.Target.popup then
@@ -343,22 +335,12 @@ M.prepare_commands = function()
 				template = M.config.template_prepend
 			end
 			if agent then
-				M.Prompt(params, target, agent, template, agent.cmd_prefix, whisper)
+				M.Prompt(params, target, agent, template, agent.cmd_prefix)
 			end
 		end
 
 		M.cmd[command] = function(params)
 			cmd(params)
-		end
-
-		if not M.whisper.disabled then
-			M.cmd["Whisper" .. command] = function(params)
-				M.whisper.Whisper(function(text)
-					vim.schedule(function()
-						cmd(params, text)
-					end)
-				end)
-			end
 		end
 	end
 end
@@ -1674,9 +1656,8 @@ end
 ---@param agent table  # obtained from get_command_agent or get_chat_agent
 ---@param template string  # template with model instructions
 ---@param prompt string | nil  # nil for non interactive commads
----@param whisper string | nil  # predefined input (e.g. obtained from Whisper)
 ---@param callback function | nil  # callback after completing the prompt
-M.Prompt = function(params, target, agent, template, prompt, whisper, callback)
+M.Prompt = function(params, target, agent, template, prompt, callback)
 	if M.deprecator.has_old_prompt_signature(agent) then
 		return
 	end
@@ -1952,7 +1933,7 @@ M.Prompt = function(params, target, agent, template, prompt, whisper, callback)
 		end
 
 		-- if prompt is provided, ask the user to enter the command
-		vim.ui.input({ prompt = prompt, default = whisper }, function(input)
+		vim.ui.input({ prompt = prompt }, function(input)
 			if not input or input == "" then
 				return
 			end
